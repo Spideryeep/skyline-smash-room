@@ -16,6 +16,7 @@ const MAX_ROOMS = 500;
 const MAX_FRAME = 256 * 1024;        // biggest single message a player may send
 const RATE_BYTES = 400 * 1024;       // per player, per second, before we drop
 const PROTOCOL = 1;
+const KEEP_EMPTY_MS = 15 * 60 * 1000;  // how long an empty private room keeps its code
 
 const rooms = new Map();             // code -> { code, public, players: Map(id -> ws) }
 let nextId = 2;                      // ids start at 2 (1 means "nobody" in the game)
@@ -45,6 +46,7 @@ function enter(ws, room) {
   leave(ws);
   const others = [...room.players.keys()];
   room.players.set(ws.id, ws);
+  room.emptySince = 0;
   ws.room = room;
   send(ws, { t: "joined", id: ws.id, code: room.code, public: room.public, peers: others, max: MAX_PLAYERS });
   for (const [, other] of room.players) {
@@ -58,7 +60,13 @@ function leave(ws) {
   room.players.delete(ws.id);
   ws.room = null;
   for (const [, other] of room.players) send(other, { t: "peer_left", id: ws.id });
-  if (room.players.size === 0) rooms.delete(room.code);
+  if (room.players.size === 0) {
+    // A private room stays open a while after everyone has gone, so its code
+    // still works when a headset went to sleep (taken off to tell a friend the
+    // code) or lost its Wi-Fi for a moment. Public rooms close at once.
+    if (room.public) rooms.delete(room.code);
+    else room.emptySince = Date.now();
+  }
 }
 
 function onControl(ws, text) {
@@ -97,8 +105,19 @@ const server = http.createServer((req, res) => {
   // Render (and people) can open the address in a browser to check it's up.
   let players = 0;
   for (const r of rooms.values()) players += r.players.size;
+  const live = [...rooms.values()].filter(r => r.players.size > 0).length;
+  if (req.url && req.url.startsWith("/rooms")) {
+    // the open public rooms, for the game's room page (newest game versions)
+    const open = [...rooms.values()]
+      .filter(r => r.public && r.players.size > 0 && r.players.size < MAX_PLAYERS)
+      .map(r => ({ code: r.code, n: r.players.size }))
+      .slice(0, 20);
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end(JSON.stringify({ v: PROTOCOL, rooms: live, players, public: open }));
+    return;
+  }
   res.writeHead(200, { "content-type": "text/plain" });
-  res.end(`Skyline Smash room server is running. Rooms: ${rooms.size}, players: ${players}\n`);
+  res.end(`Skyline Smash room server is running. Rooms: ${live}, players: ${players}\n`);
 });
 
 const wss = new WebSocketServer({ server, maxPayload: MAX_FRAME });
@@ -122,6 +141,14 @@ wss.on("connection", (ws) => {
   ws.on("close", () => leave(ws));
   ws.on("error", () => leave(ws));
 });
+
+// Close private rooms that have been empty for a while.
+setInterval(() => {
+  const now = Date.now();
+  for (const [code, room] of rooms) {
+    if (room.players.size === 0 && room.emptySince && now - room.emptySince > KEEP_EMPTY_MS) rooms.delete(code);
+  }
+}, 30000);
 
 // Byte budget refill, and drop players whose headset went away without saying.
 setInterval(() => { for (const ws of wss.clients) ws.bytes = 0; }, 1000);
