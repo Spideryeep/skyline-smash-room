@@ -101,6 +101,11 @@ function onControl(ws, text) {
   }
 }
 
+// Early Access: while this is on, anyone whose game asks the server gets the
+// Early Access badge (kept forever). To end early access, set the environment
+// variable EARLY_ACCESS to off on Render (Environment tab) and save.
+const EARLY = !/^(off|false|0|no)$/i.test(String(process.env.EARLY_ACCESS || "on").trim());
+
 const server = http.createServer((req, res) => {
   // Render (and people) can open the address in a browser to check it's up.
   let players = 0;
@@ -113,7 +118,7 @@ const server = http.createServer((req, res) => {
       .map(r => ({ code: r.code, n: r.players.size }))
       .slice(0, 20);
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
-    res.end(JSON.stringify({ v: PROTOCOL, rooms: live, players, public: open }));
+    res.end(JSON.stringify({ v: PROTOCOL, rooms: live, players, public: open, early: EARLY }));
     return;
   }
   res.writeHead(200, { "content-type": "text/plain" });

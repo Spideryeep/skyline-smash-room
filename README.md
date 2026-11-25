@@ -31,3 +31,17 @@ npm install
 npm start
 ```
 It listens on port 8080 (or `$PORT`).
+
+## Early Access badge
+
+While early access is on, every player who joins gets the Early Access badge
+in the game, and keeps it forever. It is on by default.
+
+To end early access:
+
+1. Open the room service on Render and go to **Environment**.
+2. Add the variable `EARLY_ACCESS` with the value `off`, then **Save**.
+3. Render restarts the server. From then on nobody new gets the badge;
+   players who already have it keep it.
+
+To turn it back on, change the value to `on` (or delete the variable).
