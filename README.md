@@ -45,3 +45,25 @@ To end early access:
    players who already have it keep it.
 
 To turn it back on, change the value to `on` (or delete the variable).
+
+## Owner check
+
+The room server decides who the Owner is, so the Owner APK on its own gives
+no owner powers in a room.
+
+1. Open the room service on Render and go to **Environment**.
+2. Add the variable `OWNER_KEY` with a secret key of at least 8 letters and
+   numbers, then **Save**. Keep the key to yourself: don't put it in this repo,
+   the game's source or any APK.
+3. Click **Manual Deploy**, then **Deploy latest commit**, so the server with
+   the owner check runs.
+4. On the Quest, in the Owner APK, open Leo's Computer, press OPTIONS, then 5
+   (OWNER KEY), type the key and press ENTER. It's saved on the headset.
+5. Join a room. "OWNER CONFIRMED BY THE ROOM SERVER" means it worked.
+
+Without `OWNER_KEY` nobody is the Owner in rooms. After 5 wrong keys a
+connection stops being listened to until it reconnects.
+
+Later, for the Meta store version, the game can prove who you are with your
+Meta user id instead. That needs `META_APP_ID`, `META_APP_SECRET` and
+`OWNER_META_ID` on Render. Set `META_APP_SECRET` only there, never in a file.
