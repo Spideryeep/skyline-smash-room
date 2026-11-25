@@ -67,3 +67,43 @@ connection stops being listened to until it reconnects.
 Later, for the Meta store version, the game can prove who you are with your
 Meta user id instead. That needs `META_APP_ID`, `META_APP_SECRET` and
 `OWNER_META_ID` on Render. Set `META_APP_SECRET` only there, never in a file.
+
+## Bans and mods
+
+The room server keeps the ban list and the mod list, so a ban works in every
+room, not just the one it happened in.
+
+- The Owner can ban, unban, make mods and take mod away.
+- A mod has the Ban Hammer only. A mod's ban is a request: it waits for the
+  Owner to say yes (and pick how long) before anyone is banned.
+- Nobody can ban the Owner.
+- The lists are saved in `lists.json` on the server. Render's free plan wipes
+  that file when the server restarts, so the Owner's game keeps a copy and puts
+  it back the next time the Owner is confirmed.
+
+To check that Render runs this version, open your server address with
+`/rooms` on the end. The text should include `"bans":true`.
+
+## Update the server on Render
+
+Render runs whatever is in the GitHub repository. After Claude pushes a change:
+
+1. Open dashboard.render.com and tap the **skyline-smash-rooms** service.
+2. Look at **Events**. If the newest deploy shows the latest commit message
+   and says **Deploy live**, you're done: Render did it by itself.
+3. If not, tap **Manual Deploy**, then **Deploy latest commit**, and wait
+   until it says **Live** (a minute or two).
+4. Check: open your server address with `/rooms` on the end and look for
+   `"bans":true`.
+
+Your Environment settings (`OWNER_KEY`, `EARLY_ACCESS` and so on) stay as they
+are; a deploy doesn't change them.
+
+## Tests
+
+```
+npm install
+npm test
+```
+The test starts its own copy of the server with a made-up key and checks the
+Owner check, bans, mod requests, unbans and that the lists survive a restart.
