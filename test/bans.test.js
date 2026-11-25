@@ -155,6 +155,25 @@ async function main() {
     owner2.say({ t: "unban", name: "BADC" });
     check(!!(await owner2.wait("unban_ok")), "the Owner unbans BADC");
     check((await status(PIDS.bad)).ban === 0, "BADC is no longer banned");
+    // the name now belongs to another game (the banned one was put on again,
+    // or someone else took the name): unbanning by name still lifts the ban
+    owner2.say({ t: "ban", name: "BADC", mins: 0 });
+    await owner2.wait("ban_ok");
+    const again = await client("BADC", "d".repeat(32));
+    await again.wait("you");
+    owner2.say({ t: "unban", name: "BADC" });
+    const u2 = await owner2.wait("unban_ok");
+    check(!!u2 && (await status(PIDS.bad)).ban === 0, "unbanning by name works when another game now has that name");
+    again.close();
+    // by the player id from the Owner's own list, even under another name
+    owner2.say({ t: "ban", name: "BADC", mins: 0 });   // the name is the newer game's now
+    await owner2.wait("ban_ok");
+    const banned2 = (await status("d".repeat(32))).ban !== 0;
+    owner2.say({ t: "unban", name: "WRONG NAME", pid: "d".repeat(32) });
+    check(banned2 && !!(await owner2.wait("unban_ok")) && (await status("d".repeat(32))).ban === 0, "unbanning by the player id from the Owner's list works");
+    owner2.say({ t: "unban", name: "NOBODY" });
+    const no = await owner2.wait("tool_no");
+    check(!!no && no.why === "not_banned", "unbanning someone who isn't banned says so");
     owner2.say({ t: "unmod", name: "MODB" });
     const m2 = await mod2.wait("mod");
     check(m2 && m2.on === false, "the Owner takes mod away from MODB");

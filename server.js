@@ -291,12 +291,23 @@ function onTools(ws, m) {
     }
     case "unban": {
       if (!ws.owner) return;
+      // Every ban that matches: the player id the Owner's list gave, every
+      // ban kept under that name (someone else may play under the name now,
+      // or the banned game was put on again), and the player aimed at.
+      const name = cleanName(m.name);
+      const hit = new Set();
+      if (validPid(m.pid) && bans.has(m.pid)) hit.add(m.pid);
+      if (name) for (const [pid, b] of bans) if (b.name === name) hit.add(pid);
       const t = findTarget(ws, m);
-      if (!t || !t.pid || !bans.has(t.pid)) return send(ws, { t: "tool_no", why: "not_banned", name: t ? t.name : cleanName(m.name) });
-      bans.delete(t.pid);
+      if (t && t.pid && bans.has(t.pid)) hit.add(t.pid);
+      const shown = name || (t ? t.name : "") || (hit.size ? bans.get([...hit][0]).name : "");
+      if (!hit.size) return send(ws, { t: "tool_no", why: "not_banned", name: shown });
+      for (const pid of hit) {
+        bans.delete(pid);
+        for (const w of socketsOf(pid)) send(w, { t: "unbanned" });
+      }
       saveLists();
-      for (const w of socketsOf(t.pid)) send(w, { t: "unbanned" });
-      return send(ws, { t: "unban_ok", name: t.name });
+      return send(ws, { t: "unban_ok", name: shown, n: hit.size });
     }
     case "lists":
       if (ws.owner) sendLists(ws);
