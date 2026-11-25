@@ -52,7 +52,7 @@ function client(name, pid) {
           setTimeout(() => { const i = ws.waiters.indexOf(w); if (i >= 0) { ws.waiters.splice(i, 1); r2(null); } }, ms);
         });
       };
-      ws.say({ t: "me", pid, name });
+      if (pid) ws.say({ t: "me", pid, name });   // an old game (no pid) never says who it is
       res(ws);
     });
   });
@@ -120,6 +120,24 @@ async function main() {
 
     owner.say({ t: "ban", name: "LEO", mins: 0 });
     check(!(await owner.wait("banned", 400)), "the Owner can't be banned");
+
+    // a player with an old version of the game (no player id)
+    const old = await client("", null);
+    old.say({ t: "join", code });
+    const oj = await old.wait("joined");
+    check(!!oj, "a player with an old game joins");
+    mod.say({ t: "ban", id: oj.id, mins: 0 });
+    const on = await mod.wait("tool_no");
+    check(on && on.why === "old_game", "a mod is told that player has an old game");
+    owner.say({ t: "ban", id: oj.id, mins: 0 });
+    check(!!(await owner.wait("kick_ok")), "the Owner's ban kicks the old game out");
+    const ke = await old.wait("error");
+    check(ke && ke.why === "kicked", "the old game is told it was kicked");
+    const old2 = await client("", null);
+    old2.say({ t: "join", code });
+    const ke2 = await old2.wait("error");
+    check(ke2 && ke2.why === "kicked", "it can't come straight back to that room");
+    old2.close();
 
     // the lists survive a server restart (on Render, until the free plan wipes the disk)
     for (const c of [owner, mod, bad]) c.close();

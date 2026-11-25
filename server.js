@@ -189,6 +189,30 @@ function findTarget(ws, m) {
   return null;
 }
 
+// Players whose game is too old to have a player id can't be banned for good.
+// The Owner's ban kicks them out of the room instead, and keeps that
+// connection's address out of that room for a while.
+const KICK_MINS = 10;
+const kicks = new Map();   // "room code|address" -> until (ms)
+function kickedFrom(code, ip) {
+  const k = `${code}|${ip}`;
+  const until = kicks.get(k);
+  if (!until) return false;
+  if (until > Date.now()) return true;
+  kicks.delete(k);
+  return false;
+}
+function kick(t) {
+  const room = t.room;
+  if (room && t.ip) {
+    kicks.set(`${room.code}|${t.ip}`, Date.now() + KICK_MINS * 60000);
+    while (kicks.size > 5000) kicks.delete(kicks.keys().next().value);
+  }
+  send(t, { t: "error", why: "kicked" });
+  leave(t);
+  try { t.close(); } catch {}
+}
+
 function applyBan(pid, name, mins) {
   const until = mins > 0 ? Date.now() + Math.min(mins, 525600) * 60000 : 0;
   bans.set(pid, { name, until });
@@ -220,6 +244,12 @@ function onTools(ws, m) {
     case "ban": {
       if (!ws.owner && !isMod) return;
       const t = findTarget(ws, m);
+      if (t && !t.pid && t.ws && !t.ws.owner) {
+        // an old version of the game: the Owner can still kick them out
+        if (!ws.owner) return send(ws, { t: "tool_no", why: "old_game", name: t.name });
+        kick(t.ws);
+        return send(ws, { t: "kick_ok", name: t.name, mins: KICK_MINS });
+      }
       if (!t || !t.pid) return send(ws, { t: "tool_no", why: "not_found", name: cleanName(m.name) });
       if (t.ws && t.ws.owner) return send(ws, { t: "tool_no", why: "owner", name: t.name });
       if (ws.owner) {
@@ -350,7 +380,7 @@ function onControl(ws, text) {
       break;
     }
     case "random": {
-      const open = [...rooms.values()].filter(r => r.public && r.players.size < MAX_PLAYERS && r !== ws.room);
+      const open = [...rooms.values()].filter(r => r.public && r.players.size < MAX_PLAYERS && r !== ws.room && (ws.owner || !kickedFrom(r.code, ws.ip)));
       let room = open.length ? open[Math.floor(Math.random() * open.length)] : makeRoom(true);
       if (!room) return send(ws, { t: "error", why: "full" });
       enter(ws, room);
@@ -361,6 +391,7 @@ function onControl(ws, text) {
       const room = rooms.get(code);
       if (!room) return send(ws, { t: "error", why: "no_room", code });
       if (room.players.size >= MAX_PLAYERS) return send(ws, { t: "error", why: "room_full", code });
+      if (!ws.owner && kickedFrom(room.code, ws.ip)) return send(ws, { t: "error", why: "kicked", code });
       enter(ws, room);
       break;
     }
@@ -416,8 +447,11 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocketServer({ server, maxPayload: MAX_FRAME });
 
-wss.on("connection", (ws) => {
+wss.on("connection", (ws, req) => {
   ws.id = nextId++;
+  // the player's address (Render passes it on in x-forwarded-for); only used
+  // to keep a kicked old game out of a room for a few minutes
+  ws.ip = String((req && req.headers["x-forwarded-for"]) || (req && req.socket && req.socket.remoteAddress) || "").split(",")[0].trim();
   if (nextId > 2000000000) nextId = 2;
   ws.room = null;
   ws.owner = false;

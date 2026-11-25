@@ -77,6 +77,10 @@ room, not just the one it happened in.
 - A mod has the Ban Hammer only. A mod's ban is a request: it waits for the
   Owner to say yes (and pick how long) before anyone is banned.
 - Nobody can ban the Owner.
+- A player on an old version of the game (from before bans) has no player id,
+  so they can't be banned for good. The Owner's ban kicks them out of the room
+  instead and keeps their connection out of that room for 10 minutes. A mod is
+  told that player has an old version.
 - The lists are saved in `lists.json` on the server. Render's free plan wipes
   that file when the server restarts, so the Owner's game keeps a copy and puts
   it back the next time the Owner is confirmed.
