@@ -430,7 +430,26 @@ function onControl(ws, text) {
 // variable EARLY_ACCESS to off on Render (Environment tab) and save.
 const EARLY = !/^(off|false|0|no)$/i.test(String(process.env.EARLY_ACCESS || "on").trim());
 
+// The privacy policy for the Meta store listing: <server address>/privacy.
+// Put the contact email in the PRIVACY_EMAIL environment variable on Render.
+const PRIVACY_EMAIL = String(process.env.PRIVACY_EMAIL || "").trim();
+function privacyPage() {
+  let page;
+  try { page = fs.readFileSync(path.join(__dirname, "privacy.html"), "utf8"); } catch { return null; }
+  const esc = (t) => t.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const contact = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/.test(PRIVACY_EMAIL)
+    ? `<a href="mailto:${esc(PRIVACY_EMAIL)}">${esc(PRIVACY_EMAIL)}</a>`
+    : "[CONTACT EMAIL]";
+  return page.replace("{{CONTACT}}", contact);
+}
+const PRIVACY = privacyPage();
+
 const server = http.createServer((req, res) => {
+  if (req.url && /^\/privacy(\.html)?\/?(\?.*)?$/.test(req.url)) {
+    if (!PRIVACY) { res.writeHead(404, { "content-type": "text/plain" }); return res.end("Not found\n"); }
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "max-age=300" });
+    return res.end(PRIVACY);
+  }
   // Render (and people) can open the address in a browser to check it's up.
   let players = 0;
   for (const r of rooms.values()) players += r.players.size;

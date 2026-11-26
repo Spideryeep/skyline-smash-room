@@ -88,6 +88,10 @@ room, not just the one it happened in.
 To check that Render runs this version, open your server address with
 `/rooms` on the end. The text should include `"bans":true`.
 
+## Privacy policy
+
+The server shows the game's privacy policy at `https://skyline-smash-room.onrender.com/privacy` (the text is in `privacy.html`). Use that address in the Meta store listing's Privacy Policy box. To put your contact email on it: Render, the skyline-smash-room service, **Environment**, add `PRIVACY_EMAIL` with the email address, and save. Until then the page shows `[CONTACT EMAIL]`. If the game starts collecting anything new, update `privacy.html` and the date at the top.
+
 ## Update the server on Render
 
 Render runs whatever is in the GitHub repository. After Claude pushes a change:
